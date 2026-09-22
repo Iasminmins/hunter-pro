@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#071321" />
+    <meta name="description" content="Central de monitoramento estatístico do Hunter HSG." />
+    <title>HUNTER HSG CONTROL CENTER</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/src/app.mjs"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <a class="brand" href="#geral" aria-label="HUNTER HSG Control Center, início">
+          <span class="brand-mark">H</span><span><strong>HUNTER HSG</strong><small>CONTROL CENTER</small></span>
+        </a>
+        <nav class="nav" aria-label="Navegação principal">
+          <button class="nav-item" data-page="geral" aria-current="page"><span aria-hidden="true">◈</span> Geral</button>
+          <button class="nav-item" data-page="filtros"><span aria-hidden="true">◌</span> Filtros HSG</button>
+          <button class="nav-item" data-page="pesquisa"><span aria-hidden="true">⌕</span> Pesquisa RG</button>
+          <button class="nav-item" data-page="versoes"><span aria-hidden="true">▣</span> Versões</button>
+        </nav>
+        <div class="sidebar-foot"><span class="dot"></span> Ambiente demonstrativo</div>
+      </aside>
+      <main class="main-area">
+        <header class="mobile-bar"><button id="menu-toggle" class="icon-button" aria-label="Abrir navegação" aria-expanded="false">☰</button><span>HUNTER HSG</span></header>
+        <div class="content-wrap">
+          <div class="breadcrumb">HSG <span>/</span> MONITORAMENTO ESTATÍSTICO</div>
+          <header class="page-header">
+            <div><h1 id="page-title">Saúde do Hunter</h1><p id="page-subtitle">Visão consolidada do comportamento recente do sistema</p></div>
+            <div class="header-actions"><span class="health-pill"><span>●</span> SAUDÁVEL</span><button class="button primary" id="create-month">＋ Criar bloco mensal</button></div>
+          </header>
+          <div id="view" aria-live="polite"></div>
+        </div>
+      </main>
+    </div>
+    <div id="modal-root"></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
