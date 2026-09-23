@@ -21,6 +21,18 @@ function nonEmpty(area, payload) {
   return keys.some(key => Array.isArray(payload[key]) && payload[key].length > 0);
 }
 
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalize(value[key])]));
+  }
+  return value;
+}
+
+function samePayload(left, right) {
+  return JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store', ...options });
   let body = {};
@@ -61,7 +73,7 @@ export async function initializePersistence() {
   for (const area of ['hsg', 'trader']) revisions[area] = remote[area].revision;
   const migration = ['hsg', 'trader'].filter(area => nonEmpty(area, local[area]) && remote[area].revision === 0)
     .map(area => ({ area, local: local[area], remote: remote[area].payload, localExists: true, remoteExists: false }));
-  const conflicts = ['hsg', 'trader'].filter(area => nonEmpty(area, local[area]) && remote[area].revision > 0)
+  const conflicts = ['hsg', 'trader'].filter(area => nonEmpty(area, local[area]) && remote[area].revision > 0 && !samePayload(local[area], remote[area].payload))
     .map(area => ({ area, local: local[area], remote: remote[area].payload, localExists: true, remoteExists: true }));
   return { authenticated: true, hsg: remote.hsg, trader: remote.trader, local, migration: [...migration, ...conflicts] };
 }
