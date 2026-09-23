@@ -1,11 +1,13 @@
 import { seed } from './seed.mjs';
 import { csvHeaderError, csvTableError, parseCsv, parseCsvTable, parseNinjaReport, summarizeTrades, validateMonthlyInput } from './model.mjs';
+import { renderTrader } from './trader.mjs';
 
 const pages = {
   geral: ['Saúde do Hunter', 'Visão consolidada do comportamento recente do sistema'],
   filtros: ['Filtros HSG', 'Hits, overlaps e resultado por filtro'],
   pesquisa: ['Pesquisa RG', 'Hipóteses sobre padrões que continuam passando'],
-  versoes: ['Versões', 'Histórico congelado e comparação OOS / Forward']
+  versoes: ['Versões', 'Histórico congelado e comparação OOS / Forward'],
+  trader: ['Contas de trader', 'Gestão independente das suas contas de trading']
 };
 const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const number = value => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value);
@@ -28,6 +30,11 @@ function showToast(message, type = 'success') {
 function setPage(next) {
   page = next; document.querySelector('#page-title').textContent = pages[next][0]; document.querySelector('#page-subtitle').textContent = pages[next][1];
   document.querySelectorAll('.nav-item').forEach(item => item.setAttribute('aria-current', item.dataset.page === next ? 'page' : 'false'));
+  document.querySelector('.breadcrumb').innerHTML = next === 'trader' ? 'CONTAS DE TRADER <span>/</span> GESTÃO FINANCEIRA' : 'HSG <span>/</span> MONITORAMENTO ESTATÍSTICO';
+  document.querySelector('#create-month').hidden = next === 'trader';
+  document.querySelector('.health-pill').hidden = next === 'trader';
+  document.querySelector('#sidebar-status').textContent = next === 'trader' ? 'Dados locais · Contas de trader' : 'Ambiente demonstrativo · HSG';
+  document.querySelector('#mobile-title').textContent = next === 'trader' ? 'CONTAS DE TRADER' : 'HUNTER HSG';
   document.querySelector('#sidebar').classList.remove('open'); document.querySelector('#menu-toggle').setAttribute('aria-expanded', 'false'); render();
 }
 function card(title, content, extra = '') { return `<section class="panel ${extra}"><div class="panel-heading"><h2>${title}</h2></div>${content}</section>`; }
@@ -76,6 +83,7 @@ function renderVersions() {
   return `<section class="panel"><div class="panel-heading"><div><h2>Snapshots congelados</h2><p class="panel-description">Versões registradas permanecem imutáveis para preservar a comparação.</p></div><button class="button primary" data-action="create-snapshot">＋ Congelar versão</button></div>${table(['Versão','Congelada em','Desenvolvimento','OOS disponível','Status'], rows)}</section><div class="info-strip"><span>ⓘ</span><p>OOS (out-of-sample) e Forward medem o comportamento em períodos posteriores ao desenvolvimento. Nenhum período OOS real foi processado ainda.</p></div>`;
 }
 function render() {
+  if (page === 'trader') { renderTrader(view); return; }
   view.innerHTML = page === 'geral' ? renderGeneral() : page === 'filtros' ? renderFilters() : page === 'pesquisa' ? renderResearch() : renderVersions();
 }
 function closeModal() { modalRoot.innerHTML = ''; document.body.classList.remove('modal-open'); }

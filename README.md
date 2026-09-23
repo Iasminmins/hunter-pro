@@ -12,6 +12,12 @@ npm start
 
 Abra <http://127.0.0.1:4173>. Os registros importados, snapshots e auditoria ficam no `localStorage` deste navegador. Os CSVs são lidos no navegador e não são enviados a um servidor.
 
+## Contas de trader
+
+Abra **Contas de trader** na navegação principal. Esta área usa a chave `hunter-trader-state` separada dos registros HSG e permite cadastrar/arquivar contas, lançar resultados e movimentações, configurar limites individuais e importar operações CSV com prévia. CSVs são associados somente à conta escolhida pelo usuário; o formato aceito exige `date` (AAAA-MM-DD) e `pnl` líquido após taxas, com `id`, `fees` e `note` opcionais. O campo `fees` apenas preserva a parcela de taxas já incluída no PnL. Repetições são verificadas por identificador ou pela combinação de data e resultado.
+
+Os dados permanecem neste navegador e neste perfil. Não há sincronização nem backup automático. Saldo atual é uma atualização manual; resultados e movimentações não o alteram automaticamente. Drawdown fica indisponível sem histórico suficiente de equity, e valores em moedas diferentes nunca são somados.
+
 ## Testes
 
 ```bash
