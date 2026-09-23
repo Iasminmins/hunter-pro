@@ -21,6 +21,10 @@ Os dados de trader sincronizam com Neon depois da confirmação da API. CSVs sã
 
 Na aba **Projeção**, importe uma planilha Excel (.xlsx/.xls) ou CSV de resultados, escolha as colunas de data e PnL, confira a prévia e vincule os registros a uma conta existente ou crie uma conta a partir do arquivo. A projeção usa os resultados importados por mês. Informe também o caixa real separado para expansão, a reserva mínima, custos das novas contas, custos atuais, aportes e percentual de repasse. A projeção mostra cenários conservador/base/otimista por moeda. Com meses fechados importados, os cenários usam a média mensal ± variação observada; com menos de três meses, os cenários partem da média disponível e ainda têm baixa confiabilidade. O saldo nominal de uma prop firm não é tratado como caixa disponível, e nenhuma conta real é criada pela simulação.
 
+## Performance Lab
+
+Abra **Performance Lab** na navegação principal e importe relatórios NinjaTrader agregados ou CSV Grid com uma operação por linha. Grid deve incluir `Date` (ou `DateTime`) e `Profit`; data e horário são necessários para uma sequência intradiária confiável. Relatórios agregados fornecem somente os valores resumidos. As duas fontes aparecem separadas e nunca são somadas automaticamente. A prévia aponta linhas inválidas, trades possivelmente repetidos e períodos sobrepostos antes da confirmação. O Grid deve trazer datas e resultados individuais; configure o fuso IANA correspondente aos horários locais do arquivo. Timestamps com offset explícito são recusados nesta versão para evitar atribuir a operação ao dia de sessão errado. Aprovação e Saque usam perfis configuráveis; os resultados são estimativas, não garantias nem solicitações reais de pagamento. O estado usa `hunter-performance-state` e é sincronizado em uma área Neon independente.
+
 ## Testes
 
 ```bash
@@ -29,7 +33,7 @@ npm test
 
 ## Neon / PostgreSQL
 
-O projeto Neon `Hunter Pro` está na região São Paulo (`sa-east-1`). O schema aplicado está versionado em `migrations/001_hunter_pro_init.sql`; ele contempla estado serializado e tabelas relacionais para meses/trades HSG, bases históricas, snapshots imutáveis, OOS, contas, operações, movimentações e auditoria.
+O projeto Neon `Hunter Pro` está na região São Paulo (`sa-east-1`). O schema inicial está versionado em `migrations/001_hunter_pro_init.sql`; `migrations/002_performance_area.sql` habilita a área serializada independente do Performance Lab nos bancos existentes. Aplique `migrations/002_performance_area.sql` ao Neon antes de salvar dados do Lab. O schema contempla estado serializado e tabelas relacionais para meses/trades HSG, bases históricas, snapshots imutáveis, OOS, contas, operações, movimentações e auditoria.
 
 O servidor local e as funções Vercel usam a mesma API Node. `DATABASE_URL`, `APP_PASSWORD_HASH` e `SESSION_SECRET` ficam exclusivamente no servidor. Configure esses valores no projeto `iasminmins-projects/hunter-pro` somente para Production. Preview fica sem acesso ao banco de produção até receber uma branch Neon separada. Consulte [`docs/operations/neon-vercel-setup.md`](docs/operations/neon-vercel-setup.md) antes de configurar ambientes ou importar dados.
 
@@ -43,7 +47,8 @@ Importações repetidas do mesmo mês param para uma decisão explícita: atuali
 
 ## Estrutura
 
-- `src/model.mjs`: parser, validação e métricas.
+- `src/model.mjs`: parser, validação e métricas HSG.
+- `src/performance-model.mjs` e `src/performance-lab.mjs`: importação de relatórios NinjaTrader, métricas e simulações do Performance Lab.
 - `src/hsg-views.mjs`: painéis de auditoria, períodos, referências e versões.
 - `src/backup.mjs`: exportação e validação de backups locais HSG.
 - `src/app.mjs`: navegação, renderização, importação, auditoria e snapshots.

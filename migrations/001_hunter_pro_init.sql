@@ -17,7 +17,7 @@ ON CONFLICT (slug) DO NOTHING;
 -- without losing fields that are not represented by normalized reporting tables.
 CREATE TABLE IF NOT EXISTS app_state (
   workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  area text NOT NULL CHECK (area IN ('hsg', 'trader')),
+  area text NOT NULL CHECK (area IN ('hsg', 'trader', 'performance')),
   payload jsonb NOT NULL DEFAULT '{}'::jsonb,
   revision bigint NOT NULL DEFAULT 1 CHECK (revision > 0),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -162,7 +162,7 @@ CREATE INDEX IF NOT EXISTS trader_movements_account_date_idx ON trader_movements
 CREATE TABLE IF NOT EXISTS audit_log (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  area text NOT NULL CHECK (area IN ('hsg', 'trader', 'system')),
+  area text NOT NULL CHECK (area IN ('hsg', 'trader', 'performance', 'system')),
   action text NOT NULL,
   record_id text,
   details jsonb NOT NULL DEFAULT '{}'::jsonb,

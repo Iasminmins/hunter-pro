@@ -1,5 +1,6 @@
 import { csvHeaderError, csvTableError, parseCsv, parseCsvTable, parseNinjaReport, summarizeTrades, validateMonthlyInput } from './model.mjs';
 import { initializeTraderState, renderTrader } from './trader.mjs';
+import { initializePerformanceState, renderPerformanceLab } from './performance-lab.mjs';
 import { renderHsgPage } from './hsg-views.mjs';
 import { exportHsgBackup, parseHsgBackup } from './backup.mjs';
 import { initializePersistence, importLocalState, login, logout, saveArea, setPersistenceStatusHandler, useRemoteState } from './persistence.mjs';
@@ -10,7 +11,8 @@ const pages = {
   pesquisa: ['Pesquisa RG', 'Hipóteses sobre padrões que continuam passando'],
   versoes: ['Versões', 'Histórico congelado e comparação OOS / Forward'],
   meses: ['Meses', 'Fechamentos operacionais e regime recente'],
-  trader: ['Contas de trader', 'Gestão independente das suas contas de trading']
+  trader: ['Contas de trader', 'Gestão independente das suas contas de trading'],
+  performance: ['Performance Lab', 'Histórico NinjaTrader e simulações configuráveis']
 };
 const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
@@ -19,8 +21,9 @@ const modalRoot = document.querySelector('#modal-root');
 const authRoot = document.querySelector('#auth-root');
 let page = 'geral';
 let toastTimer;
-const syncStates = { hsg: 'saved', trader: 'saved' };
+const syncStates = { hsg: 'saved', trader: 'saved', performance: 'saved' };
 let state = loadState();
+let performanceState = initializePerformanceState();
 let pendingRestore = null;
 
 function loadState(source = null) {
@@ -47,16 +50,17 @@ function showToast(message, type = 'success') {
 function setPage(next) {
   page = next; document.querySelector('#page-title').textContent = pages[next][0]; document.querySelector('#page-subtitle').textContent = pages[next][1];
   document.querySelectorAll('.nav-item').forEach(item => item.setAttribute('aria-current', item.dataset.page === next ? 'page' : 'false'));
-  document.querySelector('.breadcrumb').innerHTML = next === 'trader' ? 'CONTAS DE TRADER <span>/</span> GESTÃO FINANCEIRA' : 'HSG <span>/</span> MONITORAMENTO ESTATÍSTICO';
-  document.querySelector('#create-month').hidden = next === 'trader' || next === 'versoes' || next === 'meses';
-  document.querySelector('.health-pill').hidden = next === 'trader';
+  document.querySelector('.breadcrumb').innerHTML = next === 'trader' ? 'CONTAS DE TRADER <span>/</span> GESTÃO FINANCEIRA' : next === 'performance' ? 'PERFORMANCE LAB <span>/</span> ANÁLISE E SIMULAÇÃO' : 'HSG <span>/</span> MONITORAMENTO ESTATÍSTICO';
+  document.querySelector('#create-month').hidden = ['trader','performance','versoes','meses'].includes(next);
+  document.querySelector('.health-pill').hidden = next === 'trader' || next === 'performance';
   document.querySelector('.health-pill').innerHTML = `<span>●</span> ${state.months.some(block => block.trades?.length) ? 'AUDITORIA PENDENTE' : 'AGUARDANDO DADOS'}`;
-  document.querySelector('#sidebar-status').textContent = next === 'trader' ? 'Neon · Contas de trader' : 'Neon · HSG';
-  document.querySelector('#mobile-title').textContent = next === 'trader' ? 'CONTAS DE TRADER' : 'HUNTER HSG';
+  document.querySelector('#sidebar-status').textContent = next === 'trader' ? 'Neon · Contas de trader' : next === 'performance' ? 'Neon · Performance Lab' : 'Neon · HSG';
+  document.querySelector('#mobile-title').textContent = next === 'trader' ? 'CONTAS DE TRADER' : next === 'performance' ? 'PERFORMANCE LAB' : 'HUNTER HSG';
   document.querySelector('#sidebar').classList.remove('open'); document.querySelector('#menu-toggle').setAttribute('aria-expanded', 'false'); render();
 }
 function render() {
   if (page === 'trader') { renderTrader(view); return; }
+  if (page === 'performance') { renderPerformanceLab(view,performanceState,next=>{performanceState=next;saveArea('performance',next).catch(()=>{});}); return; }
   document.querySelector('.health-pill').innerHTML = `<span>●</span> ${state.months.some(block => block.trades?.length) ? 'AUDITORIA PENDENTE' : 'AGUARDANDO DADOS'}`;
   view.innerHTML = renderHsgPage(page,state);
   if (page === 'meses') view.querySelector('#month-year')?.addEventListener('change', event => { state.selectedMonthYear=Number(event.target.value); persist(); render(); });
@@ -236,11 +240,12 @@ function showLogin(message = '') {
 
 function migrationCounts(area, payload = {}) {
   if (area === 'hsg') return `${payload.months?.length || 0} fechamentos, ${payload.historicalBases?.length || 0} bases, ${payload.historicalSlots?.length || 0} slots, ${payload.snapshots?.length || 0} snapshots e ${payload.audit?.length || 0} eventos`;
+  if (area === 'performance') return `${payload.datasets?.length || 0} conjuntos, ${payload.audit?.length || 0} eventos`;
   return `${payload.accounts?.length || 0} contas, ${payload.trades?.length || 0} operações, ${payload.movements?.length || 0} movimentações e ${payload.audit?.length || 0} eventos`;
 }
 
 function renderMigration(result) {
-  const rows = result.migration.map(item => `<section class="migration-area"><h2>${item.area === 'hsg' ? 'Dados HSG' : 'Contas de trader'}</h2><p>Navegador: ${migrationCounts(item.area, item.local)}${item.remoteExists ? `<br>Neon: ${migrationCounts(item.area, item.remote)}` : '<br>Neon: vazio'}</p><label><input type="radio" name="${item.area}" value="local"> Importar dados do navegador para o Neon</label><label><input type="radio" name="${item.area}" value="remote"> Usar os dados do Neon${item.remoteExists ? '' : ' (manter vazio)'}</label></section>`).join('');
+  const rows = result.migration.map(item => `<section class="migration-area"><h2>${item.area === 'hsg' ? 'Dados HSG' : item.area === 'performance' ? 'Performance Lab' : 'Contas de trader'}</h2><p>Navegador: ${migrationCounts(item.area, item.local)}${item.remoteExists ? `<br>Neon: ${migrationCounts(item.area, item.remote)}` : '<br>Neon: vazio'}</p><label><input type="radio" name="${item.area}" value="local"> Importar dados do navegador para o Neon</label><label><input type="radio" name="${item.area}" value="remote"> Usar os dados do Neon${item.remoteExists ? '' : ' (manter vazio)'}</label></section>`).join('');
   authRoot.innerHTML = `<main class="auth-card auth-card-wide"><span class="eyebrow">MIGRAÇÃO SEGURA</span><h1>Escolha quais dados manter</h1><p>Os dados locais continuarão preservados até o Neon confirmar a importação. Para cada área, escolha a origem antes de continuar.</p><form id="migration-form">${rows}<div class="auth-error" role="alert"></div><button class="button primary" type="submit">Aplicar escolhas e abrir o app</button><button class="button secondary" type="button" id="migration-reload">Recarregar estado do banco</button></form></main>`;
   authRoot.querySelector('#migration-reload').addEventListener('click', async () => {
     try { await logout(); showLogin('Sessão encerrada. Entre novamente para carregar o estado atualizado.'); }
@@ -257,7 +262,7 @@ function renderMigration(result) {
     }
     button.disabled = true;
     try {
-      const selected = { hsg: result.hsg.payload, trader: result.trader.payload };
+      const selected = { hsg: result.hsg.payload, trader: result.trader.payload, performance: result.performance.payload };
       for (const item of result.migration) {
         if (choices[item.area] === 'local') {
           await importLocalState(item.area, item.local);
@@ -278,7 +283,9 @@ function renderMigration(result) {
 async function openApplication(selected) {
   if (selected.hsg) useRemoteState('hsg', selected.hsg);
   if (selected.trader) useRemoteState('trader', selected.trader);
+  if (selected.performance) useRemoteState('performance', selected.performance);
   state = loadState(selected.hsg || {});
+  performanceState = initializePerformanceState(selected.performance || {});
   initializeTraderState(selected.trader || {});
   authRoot.innerHTML = '';
   document.body.classList.remove('auth-locked');
@@ -294,7 +301,7 @@ async function openApplication(selected) {
 async function finishStartup(result) {
   if (!result.authenticated) { showLogin(); return; }
   if (result.migration.length) { renderMigration(result); return; }
-  await openApplication({ hsg: result.hsg.payload, trader: result.trader.payload });
+  await openApplication({ hsg: result.hsg.payload, trader: result.trader.payload, performance: result.performance.payload });
 }
 
 setPersistenceStatusHandler(showSyncStatus);

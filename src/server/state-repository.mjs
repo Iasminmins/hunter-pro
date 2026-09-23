@@ -1,6 +1,6 @@
 import { getPool } from './db.mjs';
 
-const AREAS = new Set(['hsg', 'trader']);
+const AREAS = new Set(['hsg', 'trader', 'performance']);
 
 export class RevisionConflictError extends Error {
   constructor(revision) {
@@ -238,7 +238,7 @@ export async function writeArea(area, payload, expectedRevision) {
       [workspace, area, json(payload), nextRevision]
     );
     if (area === 'hsg') await mirrorHsg(client, workspace, payload);
-    else await mirrorTrader(client, workspace, payload);
+    else if (area === 'trader') await mirrorTrader(client, workspace, payload);
     await client.query(
       `INSERT INTO audit_log (workspace_id, area, action, details)
        VALUES ($1, $2, 'state-save', $3::jsonb)`,

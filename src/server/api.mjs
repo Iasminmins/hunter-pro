@@ -2,7 +2,7 @@ import { createSessionCookie, expiredSessionCookie, login, verifySession } from 
 import { readArea, RevisionConflictError, SchemaUnavailableError, writeArea } from './state-repository.mjs';
 
 const MAX_BODY_BYTES = 4_000_000;
-const ALLOWED_AREAS = new Set(['hsg', 'trader']);
+const ALLOWED_AREAS = new Set(['hsg', 'trader', 'performance']);
 
 function send(response, status, body, headers = {}) {
   response.statusCode = status;

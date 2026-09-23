@@ -1,9 +1,10 @@
-const KEYS = { hsg: 'hunter-hsg-state', trader: 'hunter-trader-state' };
-const revisions = { hsg: 0, trader: 0 };
-const queues = { hsg: Promise.resolve(), trader: Promise.resolve() };
-const latest = { hsg: null, trader: null };
-const sequences = { hsg: 0, trader: 0 };
-const dirty = { hsg: false, trader: false };
+const AREAS = ['hsg', 'trader', 'performance'];
+const KEYS = { hsg: 'hunter-hsg-state', trader: 'hunter-trader-state', performance: 'hunter-performance-state' };
+const revisions = Object.fromEntries(AREAS.map(area => [area, 0]));
+const queues = Object.fromEntries(AREAS.map(area => [area, Promise.resolve()]));
+const latest = Object.fromEntries(AREAS.map(area => [area, null]));
+const sequences = Object.fromEntries(AREAS.map(area => [area, 0]));
+const dirty = Object.fromEntries(AREAS.map(area => [area, false]));
 let statusHandler = () => {};
 
 function parseLocal(area) {
@@ -17,7 +18,7 @@ function nonEmpty(area, payload) {
   if (!payload || typeof payload !== 'object') return false;
   const keys = area === 'hsg'
     ? ['months', 'historicalBases', 'historicalSlots', 'snapshots', 'audit']
-    : ['accounts', 'trades', 'movements', 'audit'];
+    : area === 'trader' ? ['accounts', 'trades', 'movements', 'audit'] : ['datasets', 'audit'];
   return keys.some(key => Array.isArray(payload[key]) && payload[key].length > 0);
 }
 
@@ -67,15 +68,15 @@ export async function logout() {
 export async function initializePersistence() {
   const authenticated = await checkSession();
   if (!authenticated) return { authenticated: false };
-  const [hsg, trader] = await Promise.all([api('/api/state/hsg'), api('/api/state/trader')]);
-  const local = { hsg: parseLocal('hsg'), trader: parseLocal('trader') };
-  const remote = { hsg, trader };
-  for (const area of ['hsg', 'trader']) revisions[area] = remote[area].revision;
-  const migration = ['hsg', 'trader'].filter(area => nonEmpty(area, local[area]) && remote[area].revision === 0)
+  const entries = await Promise.all(AREAS.map(async area => [area, await api(`/api/state/${area}`)]));
+  const remote = Object.fromEntries(entries);
+  const local = Object.fromEntries(AREAS.map(area => [area, parseLocal(area)]));
+  for (const area of AREAS) revisions[area] = remote[area].revision;
+  const migration = AREAS.filter(area => nonEmpty(area, local[area]) && remote[area].revision === 0)
     .map(area => ({ area, local: local[area], remote: remote[area].payload, localExists: true, remoteExists: false }));
-  const conflicts = ['hsg', 'trader'].filter(area => nonEmpty(area, local[area]) && remote[area].revision > 0 && !samePayload(local[area], remote[area].payload))
+  const conflicts = AREAS.filter(area => nonEmpty(area, local[area]) && remote[area].revision > 0 && !samePayload(local[area], remote[area].payload))
     .map(area => ({ area, local: local[area], remote: remote[area].payload, localExists: true, remoteExists: true }));
-  return { authenticated: true, hsg: remote.hsg, trader: remote.trader, local, migration: [...migration, ...conflicts] };
+  return { authenticated: true, hsg: remote.hsg, trader: remote.trader, performance: remote.performance, local, migration: [...migration, ...conflicts] };
 }
 
 export async function saveArea(area, payload) {
@@ -125,7 +126,7 @@ export function useRemoteState(area, payload) {
 }
 
 window.addEventListener('online', () => {
-  for (const area of ['hsg', 'trader']) {
+  for (const area of AREAS) {
     if (dirty[area] && latest[area]) saveArea(area, latest[area]).catch(() => {});
   }
 });
