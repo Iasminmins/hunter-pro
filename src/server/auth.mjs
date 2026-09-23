@@ -81,5 +81,5 @@ export async function login(request, password) {
     error.code = 'CONFIG_MISSING';
     throw error;
   }
-  return typeof password === 'string' && password.length <= 1024 && verifyPassword(password, encoded);
+  return typeof password === 'string' && password.length <= 1024 && await verifyPassword(password, encoded);
 }
