@@ -64,7 +64,7 @@ export async function logout() {
   await api('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
 }
 
-export async function initializePersistence({ includeMatchingLocal = false } = {}) {
+export async function initializePersistence() {
   const authenticated = await checkSession();
   if (!authenticated) return { authenticated: false };
   const [hsg, trader] = await Promise.all([api('/api/state/hsg'), api('/api/state/trader')]);
@@ -73,7 +73,7 @@ export async function initializePersistence({ includeMatchingLocal = false } = {
   for (const area of ['hsg', 'trader']) revisions[area] = remote[area].revision;
   const migration = ['hsg', 'trader'].filter(area => nonEmpty(area, local[area]) && remote[area].revision === 0)
     .map(area => ({ area, local: local[area], remote: remote[area].payload, localExists: true, remoteExists: false }));
-  const conflicts = ['hsg', 'trader'].filter(area => nonEmpty(area, local[area]) && remote[area].revision > 0 && (includeMatchingLocal || !samePayload(local[area], remote[area].payload)))
+  const conflicts = ['hsg', 'trader'].filter(area => nonEmpty(area, local[area]) && remote[area].revision > 0 && !samePayload(local[area], remote[area].payload))
     .map(area => ({ area, local: local[area], remote: remote[area].payload, localExists: true, remoteExists: true }));
   return { authenticated: true, hsg: remote.hsg, trader: remote.trader, local, migration: [...migration, ...conflicts] };
 }

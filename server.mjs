@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { handleApi } from './src/server/api.mjs';
 
 const root = resolve(fileURLToPath(new URL('.', import.meta.url)));
-const types = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.svg':'image/svg+xml' };
+const types = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.svg':'image/svg+xml' };
 const server = createServer(async (request, response) => {
   if (new URL(request.url, 'http://localhost').pathname.startsWith('/api/')) {
     await handleApi(request, response);

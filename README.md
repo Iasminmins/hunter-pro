@@ -19,7 +19,7 @@ Abra **Contas de trader** na navegação principal. Esta área usa a chave `hunt
 
 Os dados de trader sincronizam com Neon depois da confirmação da API. CSVs são lidos no navegador e somente os registros validados são enviados. Saldo atual é uma atualização manual; resultados e movimentações não o alteram automaticamente. Drawdown fica indisponível sem histórico suficiente de equity, e valores em moedas diferentes nunca são somados.
 
-Na aba **Projeção**, informe o caixa real separado para expansão, a reserva mínima, custo inicial e mensal das novas contas, custos atuais, aportes e percentual de repasse. A projeção mostra cenários conservador/base/otimista por moeda. Com pelo menos três meses fechados com operações, os cenários podem vir da média mensal observada ± variação histórica; sem amostra suficiente, informe valores mensais manualmente. O saldo nominal de uma prop firm não é tratado como caixa disponível, e nenhuma conta real é criada pela simulação.
+Na aba **Projeção**, importe uma planilha Excel (.xlsx/.xls) ou CSV de resultados, escolha as colunas de data e PnL, confira a prévia e vincule os registros a uma conta existente ou crie uma conta a partir do arquivo. A projeção usa os resultados importados por mês. Informe também o caixa real separado para expansão, a reserva mínima, custos das novas contas, custos atuais, aportes e percentual de repasse. A projeção mostra cenários conservador/base/otimista por moeda. Com meses fechados importados, os cenários usam a média mensal ± variação observada; com menos de três meses, os cenários partem da média disponível e ainda têm baixa confiabilidade. O saldo nominal de uma prop firm não é tratado como caixa disponível, e nenhuma conta real é criada pela simulação.
 
 ## Testes
 

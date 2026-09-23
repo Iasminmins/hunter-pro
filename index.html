@@ -8,6 +8,7 @@
     <title>HUNTER HSG CONTROL CENTER</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/styles.css" />
+    <script src="/vendor/xlsx.full.min.js"></script>
     <script type="module" src="/src/app.mjs"></script>
   </head>
   <body class="auth-locked">
@@ -35,7 +36,7 @@
             <div><h1 id="page-title">Saúde do Hunter</h1><p id="page-subtitle">Visão consolidada do comportamento recente do sistema</p></div>
             <div class="header-actions"><span class="health-pill"><span>●</span> AGUARDANDO DADOS</span><button class="button primary" id="create-month">＋ Criar bloco mensal</button></div>
           </header>
-          <div class="connection-bar"><span id="sync-indicator" role="status">Conectando ao banco…</span><button class="text-button" id="import-browser-data">Importar dados do navegador</button><button class="text-button" id="reload-conflict" hidden>Recarregar dados do Neon</button><button class="text-button" id="logout">Sair</button></div>
+          <div class="connection-bar"><span id="sync-indicator" role="status">Conectando ao banco…</span><button class="text-button" id="reload-conflict" hidden>Recarregar dados do Neon</button><button class="text-button" id="logout">Sair</button></div>
           <div id="view" aria-live="polite"></div>
         </div>
       </main>
