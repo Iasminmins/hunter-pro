@@ -2,10 +2,15 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { handleApi } from './src/server/api.mjs';
 
 const root = resolve(fileURLToPath(new URL('.', import.meta.url)));
 const types = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.svg':'image/svg+xml' };
 const server = createServer(async (request, response) => {
+  if (new URL(request.url, 'http://localhost').pathname.startsWith('/api/')) {
+    await handleApi(request, response);
+    return;
+  }
   const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
   const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   const target = resolve(root, relative);

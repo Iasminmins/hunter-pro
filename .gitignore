@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+.neon
+node_modules/
+*.log
+npm-debug.log*
+.vercel
+.env*
+!.env.example

@@ -10,7 +10,8 @@
     <link rel="stylesheet" href="/styles.css" />
     <script type="module" src="/src/app.mjs"></script>
   </head>
-  <body>
+  <body class="auth-locked">
+    <div id="auth-root" aria-live="polite"></div>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar">
         <a class="brand" href="#geral" aria-label="HUNTER HSG Control Center, início">
@@ -21,9 +22,10 @@
           <button class="nav-item" data-page="filtros"><span aria-hidden="true">◌</span> Filtros HSG</button>
           <button class="nav-item" data-page="pesquisa"><span aria-hidden="true">⌕</span> Pesquisa RG</button>
           <button class="nav-item" data-page="versoes"><span aria-hidden="true">▣</span> Versões</button>
+          <button class="nav-item" data-page="meses"><span aria-hidden="true">▦</span> Meses</button>
           <button class="nav-item" data-page="trader"><span aria-hidden="true">◉</span> Contas de trader</button>
         </nav>
-        <div class="sidebar-foot"><span class="dot"></span><span id="sidebar-status">Ambiente demonstrativo · HSG</span></div>
+        <div class="sidebar-foot"><span class="dot"></span><span id="sidebar-status">Dados locais · HSG</span></div>
       </aside>
       <main class="main-area">
         <header class="mobile-bar"><button id="menu-toggle" class="icon-button" aria-label="Abrir navegação" aria-expanded="false">☰</button><span id="mobile-title">HUNTER HSG</span></header>
@@ -31,8 +33,9 @@
           <div class="breadcrumb">HSG <span>/</span> MONITORAMENTO ESTATÍSTICO</div>
           <header class="page-header">
             <div><h1 id="page-title">Saúde do Hunter</h1><p id="page-subtitle">Visão consolidada do comportamento recente do sistema</p></div>
-            <div class="header-actions"><span class="health-pill"><span>●</span> SAUDÁVEL</span><button class="button primary" id="create-month">＋ Criar bloco mensal</button></div>
+            <div class="header-actions"><span class="health-pill"><span>●</span> AGUARDANDO DADOS</span><button class="button primary" id="create-month">＋ Criar bloco mensal</button></div>
           </header>
+          <div class="connection-bar"><span id="sync-indicator" role="status">Conectando ao banco…</span><button class="text-button" id="reload-conflict" hidden>Recarregar dados do Neon</button><button class="text-button" id="logout">Sair</button></div>
           <div id="view" aria-live="polite"></div>
         </div>
       </main>

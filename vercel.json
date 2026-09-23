@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "functions": {
+    "api/[...route].mjs": {
+      "maxDuration": 15
+    }
+  }
+}

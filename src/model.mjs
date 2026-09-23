@@ -2,7 +2,7 @@ const aliases = {
   timestamp: ['timestamp','datetime','date','time','data','datahora'], signalId: ['signalid','id'], symbol: ['symbol','ticker','ativo'],
   direction: ['direction','side','direcao','lado'], entryType: ['entrytype','entry_type','tipoentrada'],
   outcome: ['outcome','result','resultado','status'], resultR: ['resultr','result_r','r','pnlr'],
-  filterHits: ['filterhits','filters','filtros'], gapSize: ['gapsize','gap','gap_size'], session: ['session','sessao']
+  filterHits: ['filterhits','filters','filtros'], filterBlocks: ['filterblocks','blockedfilters','filtersblocked','bloqueios','filtrosbloqueados'], gapSize: ['gapsize','gap','gap_size'], session: ['session','sessao']
 };
 const normalize = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -47,6 +47,7 @@ export function parseCsv(text) {
     return [key, key === 'resultR' ? Number(String(raw).replace(',', '.')) : raw];
   }))).filter(item => Object.values(item).some(value => value !== '' && !Number.isNaN(value))).map(item => ({
     ...item,
+    filterBlocksAvailable: headers.some(header => aliases.filterBlocks.includes(header)),
     outcome: item.outcome || (Number.isFinite(item.resultR) ? item.resultR > 0 ? 'W' : item.resultR < 0 ? 'L' : 'BE' : '')
   }));
 }
@@ -111,6 +112,46 @@ export function summarizeTrades(trades) {
   for (const trade of trades) { equity += Number(trade.resultR) || 0; peak = Math.max(peak, equity); drawdown = Math.min(drawdown, equity - peak); }
   const totalR = trades.reduce((sum,t) => sum + (Number(t.resultR) || 0), 0);
   return { trades: trades.length, wins, losses, breakeven: trades.length - wins - losses, winRate: trades.length ? wins / trades.length : 0, profitFactor: grossLosses ? grossWins / grossLosses : grossWins ? Infinity : 0, totalR, drawdown };
+}
+
+export function aggregateFilters(trades, knownCodes = []) {
+  const codes = new Map();
+  const emptyRow = code => ({ code, hits: 0, blocks: 0, blockRate: null, exclusive: 0, overlap: 0, winsObserved: 0, lossesObserved: 0, winsBlocked: 0, lossesBlocked: 0, resultR: 0 });
+  for (const code of knownCodes) codes.set(String(code).toUpperCase(), emptyRow(String(code).toUpperCase()));
+  for (const trade of trades) {
+    const hits = [...new Set(String(trade.filterHits || '').split(/[,|;+\s]+/).map(code => code.trim().toUpperCase()).filter(Boolean))];
+    const blocks = [...new Set(String(trade.filterBlocks || '').split(/[,|;+\s]+/).map(code => code.trim().toUpperCase()).filter(Boolean))];
+    const wins = /^(w|win|winner|gain|vitoria|vitorioso)$/i.test(String(trade.outcome || '').trim());
+    const losses = /^(l|loss|loser|perda|perdedor)$/i.test(String(trade.outcome || '').trim());
+    for (const code of new Set([...hits,...blocks])) {
+      const row = codes.get(code) || emptyRow(code);
+      if (hits.includes(code)) {
+        row.hits++;
+        if (hits.length === 1) row.exclusive++; else row.overlap++;
+        if (wins) row.winsObserved++;
+        if (losses) row.lossesObserved++;
+        row.resultR += Number(trade.resultR) || 0;
+      }
+      if (blocks.includes(code)) {
+        row.blocks++;
+        if (wins) row.winsBlocked++;
+        if (losses) row.lossesBlocked++;
+      }
+      codes.set(code, row);
+    }
+  }
+  const blockDataComplete = trades.length > 0 && trades.every(trade => trade.filterBlocksAvailable === true);
+  return [...codes.values()].map(row => ({ ...row, blocks: blockDataComplete ? row.blocks : null, winsBlocked: blockDataComplete ? row.winsBlocked : null, lossesBlocked: blockDataComplete ? row.lossesBlocked : null, blockRate: blockDataComplete && row.hits ? row.blocks / row.hits : null, status: row.hits || row.blocks ? 'OCORRÊNCIA' : 'SEM DADOS' })).sort((a, b) => a.code.localeCompare(b.code));
+}
+
+export function weightedRecentMonths(blocks, weights = [0.5, 0.3, 0.2]) {
+  const recent = [...blocks].sort((a, b) => (b.year * 12 + b.month) - (a.year * 12 + a.month)).slice(0, 3);
+  if (!recent.length) return { months: [], trades: 0, totalR: null, winRate: null, profitFactor: null, weightsUsed: [] };
+  const weightsUsed = recent.map((block, index) => ({ block, weight: weights[index] }));
+  const totalWeight = weightsUsed.reduce((sum, item) => sum + item.weight, 0);
+  const combine = key => weightsUsed.reduce((sum, item) => sum + (Number(item.block.summary?.[key]) || 0) * item.weight, 0) / totalWeight;
+  const tradeCount = recent.reduce((sum, block) => sum + (Number(block.summary?.trades) || 0), 0);
+  return { months: recent, trades: tradeCount, totalR: combine('totalR'), winRate: combine('winRate'), profitFactor: combine('profitFactor'), weightsUsed: weightsUsed.map(item => ({ month: item.block.month, year: item.block.year, weight: item.weight / totalWeight })) };
 }
 
 export function csvHeaderError(text, label) {
