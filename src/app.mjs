@@ -185,6 +185,7 @@ function openSnapshotForm() {
 
 document.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', () => setPage(item.dataset.page)));
 document.querySelector('#create-month').addEventListener('click', () => openMonthForm());
+document.querySelector('#import-browser-data').addEventListener('click', openBrowserImport);
 document.querySelector('#menu-toggle').addEventListener('click', event => { const expanded = event.currentTarget.getAttribute('aria-expanded') === 'true'; event.currentTarget.setAttribute('aria-expanded', String(!expanded)); document.querySelector('#sidebar').classList.toggle('open', !expanded); });
 document.addEventListener('click', event => {
   const action = event.target.closest('[data-action]')?.dataset.action;
@@ -239,14 +240,17 @@ function migrationCounts(area, payload = {}) {
   return `${payload.accounts?.length || 0} contas, ${payload.trades?.length || 0} operações, ${payload.movements?.length || 0} movimentações e ${payload.audit?.length || 0} eventos`;
 }
 
-function renderMigration(result) {
+function renderMigration(result, { inApp = false } = {}) {
   const rows = result.migration.map(item => `<section class="migration-area"><h2>${item.area === 'hsg' ? 'Dados HSG' : 'Contas de trader'}</h2><p>Navegador: ${migrationCounts(item.area, item.local)}${item.remoteExists ? `<br>Neon: ${migrationCounts(item.area, item.remote)}` : '<br>Neon: vazio'}</p><label><input type="radio" name="${item.area}" value="local"> Importar dados do navegador para o Neon</label><label><input type="radio" name="${item.area}" value="remote"> Usar os dados do Neon${item.remoteExists ? '' : ' (manter vazio)'}</label></section>`).join('');
-  authRoot.innerHTML = `<main class="auth-card auth-card-wide"><span class="eyebrow">MIGRAÇÃO SEGURA</span><h1>Escolha quais dados manter</h1><p>Os dados locais continuarão preservados até o Neon confirmar a importação. Para cada área, escolha a origem antes de continuar.</p><form id="migration-form">${rows}<div class="auth-error" role="alert"></div><button class="button primary" type="submit">Aplicar escolhas e abrir o app</button><button class="button secondary" type="button" id="migration-reload">Recarregar estado do banco</button></form></main>`;
-  authRoot.querySelector('#migration-reload').addEventListener('click', async () => {
+  const root = inApp ? modalRoot : authRoot;
+  const formMarkup = `<form id="migration-form">${rows}<div class="auth-error" role="alert"></div><div class="modal-actions"><button class="button primary" type="submit">${inApp ? 'Aplicar importação' : 'Aplicar escolhas e abrir o app'}</button>${inApp ? '<button class="button secondary" type="button" data-action="close-modal">Cancelar</button>' : '<button class="button secondary" type="button" id="migration-reload">Recarregar estado do banco</button>'}</div></form>`;
+  if (inApp) openModal(`<div class="modal-header"><div><span class="eyebrow">IMPORTAÇÃO SEGURA</span><h2 id="modal-title">Importar dados do navegador</h2><p>Escolha a origem de cada área. A cópia local só será substituída depois que o Neon confirmar.</p></div><button type="button" class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div>${formMarkup}`);
+  else root.innerHTML = `<main class="auth-card auth-card-wide"><span class="eyebrow">MIGRAÇÃO SEGURA</span><h1>Escolha quais dados manter</h1><p>Os dados locais continuarão preservados até o Neon confirmar a importação. Para cada área, escolha a origem antes de continuar.</p>${formMarkup}</main>`;
+  if (!inApp) root.querySelector('#migration-reload').addEventListener('click', async () => {
     try { await logout(); showLogin('Sessão encerrada. Entre novamente para carregar o estado atualizado.'); }
-    catch (error) { authRoot.querySelector('.auth-error').textContent = error.message; }
+    catch (error) { root.querySelector('.auth-error').textContent = error.message; }
   });
-  authRoot.querySelector('#migration-form').addEventListener('submit', async event => {
+  root.querySelector('#migration-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
     const button = form.querySelector('[type="submit"]');
@@ -267,12 +271,26 @@ function renderMigration(result) {
           useRemoteState(item.area, item.remote);
         }
       }
-      await openApplication(selected);
+      if (inApp) { closeModal(); await openApplication(selected); showToast('Importação concluída e sincronizada com o Neon.'); }
+      else await openApplication(selected);
     } catch (error) {
-      form.querySelector('.auth-error').textContent = error.message || 'A migração não foi concluída. Os dados locais foram mantidos.';
+      form.querySelector('.auth-error').textContent = error.message || 'A importação não foi concluída. Os dados locais foram mantidos.';
       button.disabled = false;
     }
   });
+}
+
+async function openBrowserImport() {
+  const button = document.querySelector('#import-browser-data');
+  button.disabled = true;
+  try {
+    const result = await initializePersistence({ includeMatchingLocal: true });
+    if (!result.authenticated) { showLogin('Sua sessão expirou. Entre novamente para importar os dados.'); return; }
+    if (!result.migration.length) { showToast('Não há dados salvos neste navegador para importar.', 'error'); return; }
+    renderMigration(result, { inApp: true });
+  } catch (error) {
+    showToast(error.message || 'Não foi possível carregar os dados para importação.', 'error');
+  } finally { button.disabled = false; }
 }
 
 async function openApplication(selected) {
