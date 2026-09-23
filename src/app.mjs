@@ -217,7 +217,7 @@ function showSyncStatus(status) {
 
 function showLogin(message = '') {
   document.body.classList.add('auth-locked');
-  authRoot.innerHTML = `<main class="auth-card"><span class="eyebrow">HUNTER PRO · ACESSO PRIVADO</span><h1>Entrar no Hunter Pro</h1><p>Use a senha configurada para acessar seus dados sincronizados no Neon.</p><form id="login-form"><label>Senha<input name="password" type="password" autocomplete="current-password" minlength="12" required></label><div class="auth-error" role="alert">${escapeHtml(message)}</div><button class="button primary" type="submit">Entrar</button></form></main>`;
+  authRoot.innerHTML = `<main class="auth-card"><span class="eyebrow">HUNTER PRO · ACESSO PRIVADO</span><h1>Entrar no Hunter Pro</h1><p>Use a senha configurada para acessar seus dados sincronizados no Neon.</p><form id="login-form"><label>Senha<input name="password" type="password" autocomplete="current-password" minlength="8" required></label><div class="auth-error" role="alert">${escapeHtml(message)}</div><button class="button primary" type="submit">Entrar</button></form></main>`;
   authRoot.querySelector('#login-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
