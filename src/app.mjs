@@ -292,6 +292,7 @@ document.addEventListener('click', event => {
   const action = event.target.closest('[data-action]')?.dataset.action;
   if (action === 'create-month') openMonthForm(event.target.closest('[data-month]')?.dataset.month || '', event.target.closest('[data-year]')?.dataset.year || new Date().getFullYear());
   if (action === 'import-month-batch') openMonthBatchForm();
+  if (action === 'select-month-year') { const year=Number(event.target.closest('[data-year]')?.dataset.year); if(Number.isInteger(year)){state.selectedMonthYear=year;persist();render();} }
   if (action === 'delete-month') openDeleteMonthDialog(event.target.closest('[data-id]')?.dataset.id);
   if (action === 'confirm-delete-month') deleteMonthBlock(event.target.closest('[data-id]')?.dataset.id);
   if (action === 'confirm-month-batch') confirmMonthBatch();
