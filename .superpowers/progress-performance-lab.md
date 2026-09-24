@@ -17,4 +17,6 @@
 - Task 2: implemented summary/Grid parsing, duplicate and period warnings, metrics, evaluation and withdrawal calculations.
 - Task 3: implemented navigation, Performance Lab tabs, import preview/confirmation, configurable profiles, charts and responsive styling.
 - Task 4: README updated; an independent static review identified import, parser, timezone and breach-traceability issues; fixes were applied.
-- Verification: `git diff --check` and Node syntax checks passed. Automated tests and browser run were not performed. The Neon migration remains unapplied.
+- Production incident: GET `/api/state/performance` returned 404 because `api/state/performance.mjs` was missing. Added the handler, deployed production `2gcWgtUSpQrSmtvPft1Ct9av1izS`, and verified the route now returns the expected 401 while unauthenticated; `/api/auth/session` returns 200.
+- Migration `002_performance_area.sql` was applied on the Neon Hunter Pro production branch and the SQL editor reported success.
+- Verification: `git diff --check` and Node syntax checks passed. Automated tests and an authenticated browser workflow were not performed.

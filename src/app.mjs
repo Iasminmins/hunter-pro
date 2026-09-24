@@ -238,48 +238,6 @@ function showLogin(message = '') {
   });
 }
 
-function migrationCounts(area, payload = {}) {
-  if (area === 'hsg') return `${payload.months?.length || 0} fechamentos, ${payload.historicalBases?.length || 0} bases, ${payload.historicalSlots?.length || 0} slots, ${payload.snapshots?.length || 0} snapshots e ${payload.audit?.length || 0} eventos`;
-  if (area === 'performance') return `${payload.datasets?.length || 0} conjuntos, ${payload.audit?.length || 0} eventos`;
-  return `${payload.accounts?.length || 0} contas, ${payload.trades?.length || 0} operações, ${payload.movements?.length || 0} movimentações e ${payload.audit?.length || 0} eventos`;
-}
-
-function renderMigration(result) {
-  const rows = result.migration.map(item => `<section class="migration-area"><h2>${item.area === 'hsg' ? 'Dados HSG' : item.area === 'performance' ? 'Performance Lab' : 'Contas de trader'}</h2><p>Navegador: ${migrationCounts(item.area, item.local)}${item.remoteExists ? `<br>Neon: ${migrationCounts(item.area, item.remote)}` : '<br>Neon: vazio'}</p><label><input type="radio" name="${item.area}" value="local"> Importar dados do navegador para o Neon</label><label><input type="radio" name="${item.area}" value="remote"> Usar os dados do Neon${item.remoteExists ? '' : ' (manter vazio)'}</label></section>`).join('');
-  authRoot.innerHTML = `<main class="auth-card auth-card-wide"><span class="eyebrow">MIGRAÇÃO SEGURA</span><h1>Escolha quais dados manter</h1><p>Os dados locais continuarão preservados até o Neon confirmar a importação. Para cada área, escolha a origem antes de continuar.</p><form id="migration-form">${rows}<div class="auth-error" role="alert"></div><button class="button primary" type="submit">Aplicar escolhas e abrir o app</button><button class="button secondary" type="button" id="migration-reload">Recarregar estado do banco</button></form></main>`;
-  authRoot.querySelector('#migration-reload').addEventListener('click', async () => {
-    try { await logout(); showLogin('Sessão encerrada. Entre novamente para carregar o estado atualizado.'); }
-    catch (error) { authRoot.querySelector('.auth-error').textContent = error.message; }
-  });
-  authRoot.querySelector('#migration-form').addEventListener('submit', async event => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const button = form.querySelector('[type="submit"]');
-    const choices = Object.fromEntries(new FormData(form));
-    if (result.migration.some(item => !choices[item.area])) {
-      form.querySelector('.auth-error').textContent = 'Escolha uma origem para cada área antes de continuar.';
-      return;
-    }
-    button.disabled = true;
-    try {
-      const selected = { hsg: result.hsg.payload, trader: result.trader.payload, performance: result.performance.payload };
-      for (const item of result.migration) {
-        if (choices[item.area] === 'local') {
-          await importLocalState(item.area, item.local);
-          selected[item.area] = item.local;
-        } else {
-          selected[item.area] = item.remote;
-          useRemoteState(item.area, item.remote);
-        }
-      }
-      await openApplication(selected);
-    } catch (error) {
-      form.querySelector('.auth-error').textContent = error.message || 'A importação não foi concluída. Os dados locais foram mantidos.';
-      button.disabled = false;
-    }
-  });
-}
-
 async function openApplication(selected) {
   if (selected.hsg) useRemoteState('hsg', selected.hsg);
   if (selected.trader) useRemoteState('trader', selected.trader);
@@ -296,12 +254,35 @@ async function openApplication(selected) {
     catch (error) { showToast(error.message || 'Não foi possível encerrar a sessão.', 'error'); }
   };
   document.querySelector('#reload-conflict')?.addEventListener('click', () => location.reload(), { once: true });
+  const recoveryButton=document.querySelector('#migration-recovery');
+  if(recoveryButton){
+    const recoveryKey='hunter-migration-recovery-v1';
+    recoveryButton.hidden=!localStorage.getItem(recoveryKey);
+    recoveryButton.onclick=()=>{
+      const backup=localStorage.getItem(recoveryKey);
+      if(!backup)return;
+      const url=URL.createObjectURL(new Blob([backup],{type:'application/json'}));
+      const link=document.createElement('a');link.href=url;link.download=`hunter-dados-locais-${new Date().toISOString().slice(0,10)}.json`;link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    };
+  }
 }
 
 async function finishStartup(result) {
   if (!result.authenticated) { showLogin(); return; }
-  if (result.migration.length) { renderMigration(result); return; }
-  await openApplication({ hsg: result.hsg.payload, trader: result.trader.payload, performance: result.performance.payload });
+  const selected={hsg:result.hsg.payload,trader:result.trader.payload,performance:result.performance.payload};
+  const conflicts=result.migration.filter(item=>item.localExists&&item.remoteExists);
+  if(conflicts.length){
+    const recovery={version:1,createdAt:new Date().toISOString(),areas:Object.fromEntries(conflicts.map(item=>[item.area,item.local]))};
+    try{localStorage.setItem('hunter-migration-recovery-v1',JSON.stringify(recovery));}
+    catch{showLogin('Não foi possível preservar a cópia local antes de abrir os dados do Neon. Libere espaço no armazenamento do navegador e tente novamente.');return;}
+  }
+  for(const item of result.migration){
+    if(item.remoteExists)continue;
+    await importLocalState(item.area,item.local);
+    selected[item.area]=item.local;
+  }
+  await openApplication(selected);
 }
 
 setPersistenceStatusHandler(showSyncStatus);
