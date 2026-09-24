@@ -1,5 +1,5 @@
 const aliases = {
-  timestamp: ['timestamp','datetime','date','time','data','datahora'], signalId: ['signalid','id'], symbol: ['symbol','ticker','ativo'],
+  timestamp: ['timestamp','datetime','date','time','data','datahora','tradedate','closedat','entrydate','exitdate','datafechamento','datatrade'], signalId: ['signalid','id'], symbol: ['symbol','ticker','ativo'],
   direction: ['direction','side','direcao','lado'], entryType: ['entrytype','entry_type','tipoentrada'],
   outcome: ['outcome','result','resultado','status'], resultR: ['resultr','result_r','r','pnlr'],
   filterHits: ['filterhits','filters','filtros'], filterBlocks: ['filterblocks','blockedfilters','filtersblocked','bloqueios','filtrosbloqueados'], gapSize: ['gapsize','gap','gap_size'], session: ['session','sessao']
@@ -85,7 +85,8 @@ export function parseNinjaReport(text) {
     tradeCount: get('# total de negociações', 'total de negociações', 'total trades'),
     netProfit: get('lucro líquido total', 'net profit'),
     profitFactor: get('fator de lucro', 'profit factor'),
-    winRate: get('porcentagem de lucro', 'percent profitable')
+    winRate: get('porcentagem de lucro', 'percent profitable'),
+    maxDrawdown: get('drawdown máximo', 'max drawdown', 'maximum drawdown')
   };
 }
 

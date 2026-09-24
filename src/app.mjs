@@ -25,6 +25,7 @@ const syncStates = { hsg: 'saved', trader: 'saved', performance: 'saved' };
 let state = loadState();
 let performanceState = initializePerformanceState();
 let pendingRestore = null;
+let pendingMonthBatch = null;
 
 function loadState(source = null) {
   const empty = { months: [], historicalBases: [], historicalSlots: [], selectedHistoricalBaseId: '', snapshots: [], audit: [] };
@@ -80,6 +81,103 @@ function openMonthForm(defaultMonth = '', defaultYear = new Date().getFullYear()
   modalRoot.querySelector('#month-form').addEventListener('submit', submitMonth);
   if (defaultMonth) modalRoot.querySelector('[name="month"]').value = String(defaultMonth);
   modalRoot.querySelector('[name="year"]').value = String(defaultYear);
+}
+function openMonthBatchForm() {
+  openModal(`<form id="month-batch-form" novalidate><div class="modal-header"><div><span class="eyebrow">IMPORTAÇÃO EM LOTE</span><h2 id="modal-title">Importar vários meses</h2><p>Selecione os CSVs HSG e NinjaTrader. O mês será identificado pelas datas dos trades HSG; relatórios NinjaTrader serão associados pelo mês/ano no nome do arquivo.</p></div><button type="button" class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><div class="form-grid"><label class="file-field full-width"><span>CSV HSG Dataset <b>*</b></span><input name="hsgFiles" type="file" accept=".csv,text/csv" multiple required><small>O arquivo deve ter uma coluna de data (ex.: Timestamp, Date ou Data) e Result_R.</small></label><label class="file-field full-width"><span>Relatórios CSV NinjaTrader / Grid <b>*</b></span><input name="ninjaFiles" type="file" accept=".csv,text/csv" multiple required><small>Inclua mês e ano no nome de cada arquivo, por exemplo NinjaTrader 2026-09.csv.</small></label><label>Versão Hunter<input name="hunterVersion" placeholder="V24" required></label><label>Configuração HSG<input name="hsgConfig" value="F2 + F4 + F6 + F7 + RG1" required></label><label class="full-width">Observação <input name="observations" placeholder="Aplicada a todos os meses importados"></label></div><div id="form-errors" class="form-errors" role="alert"></div><div id="import-progress" class="progress-message" hidden><span class="spinner"></span> Lendo e organizando os arquivos…</div><div class="modal-actions"><button class="button secondary" type="button" data-action="close-modal">Cancelar</button><button class="button primary" type="submit">Pré-visualizar meses</button></div></form>`);
+  modalRoot.querySelector('#month-batch-form').addEventListener('submit', previewMonthBatch);
+}
+function monthFromDate(value) {
+  const text = String(value ?? '').trim();
+  let match = text.match(/^(\d{4})[-/.](\d{1,2})(?:[-/.](\d{1,2}))?/);
+  if (match) return { year:Number(match[1]), month:Number(match[2]) };
+  match = text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (match) { const first=Number(match[1]),second=Number(match[2]);return { year:Number(match[3]), month:first>12?second:second>12?first:second }; }
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? null : { year:date.getFullYear(), month:date.getMonth()+1 };
+}
+function monthFromFileName(name) {
+  const text = String(name ?? '');
+  let match = text.match(/\b(20\d{2})[-_. ](0?[1-9]|1[0-2])\b/);
+  if (match) return { year:Number(match[1]), month:Number(match[2]) };
+  match = text.match(/\b(0?[1-9]|1[0-2])[-_. ](20\d{2})\b/);
+  if (match) return { year:Number(match[2]), month:Number(match[1]) };
+  match = text.match(/\b(0?[1-9]|1[0-2])[-_. ](\d{2})\b/);
+  if (match) return { year:2000+Number(match[2]), month:Number(match[1]) };
+  const names = ['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const year = Number(normalized.match(/\b(20\d{2})\b/)?.[1]);
+  const month = names.findIndex(name => normalized.includes(name));
+  return year && month >= 0 ? { year, month:month+1 } : null;
+}
+async function previewMonthBatch(event) {
+  event.preventDefault();
+  const form=event.currentTarget, data=Object.fromEntries(new FormData(form)), errorBox=form.querySelector('#form-errors');
+  const hsgFiles=[...form.elements.hsgFiles.files], ninjaFiles=[...form.elements.ninjaFiles.files];
+  const errors=[];
+  if(!hsgFiles.length)errors.push('Selecione pelo menos um CSV HSG Dataset.');
+  if(!ninjaFiles.length)errors.push('Selecione os relatórios CSV NinjaTrader correspondentes.');
+  if(!String(data.hunterVersion||'').trim())errors.push('Informe a versão Hunter.');
+  if(!String(data.hsgConfig||'').trim())errors.push('Informe a configuração HSG.');
+  if(errors.length){errorBox.textContent=errors.join('\n');return;}
+  const submit=form.querySelector('[type="submit"]');submit.disabled=true;form.querySelector('#import-progress').hidden=false;errorBox.textContent='';
+  try {
+    const grouped=new Map();
+    for(const file of hsgFiles){
+      const text=await file.text(), headerError=csvHeaderError(text,`CSV HSG ${file.name}`);
+      if(headerError)throw new Error(headerError);
+      const trades=parseCsv(text).map((trade,index)=>({...trade,id:crypto.randomUUID(),sourceRow:index+1,sourceFile:file.name}));
+      for(const trade of trades){
+        const period=monthFromDate(trade.timestamp);
+        if(!period||period.month<1||period.month>12||period.year<2000||period.year>2100)throw new Error(`${file.name}: não consegui identificar uma data válida em uma das operações. Verifique a coluna Timestamp/Date/Data.`);
+        const key=`${period.year}-${String(period.month).padStart(2,'0')}`;
+        if(!grouped.has(key))grouped.set(key,{...period,trades:[],hsgFiles:new Set(),ninjaFile:null});
+        const group=grouped.get(key);group.trades.push(trade);group.hsgFiles.add(file.name);
+      }
+    }
+    for(const file of ninjaFiles){
+      const period=monthFromFileName(file.name);
+      if(!period)throw new Error(`${file.name}: inclua o mês e o ano no nome do arquivo, como 2026-09.`);
+      const key=`${period.year}-${String(period.month).padStart(2,'0')}`, group=grouped.get(key);
+      if(!group)throw new Error(`${file.name}: não existe CSV HSG com trades de ${months[period.month-1]} ${period.year}.`);
+      if(group.ninjaFile)throw new Error(`Há mais de um relatório NinjaTrader para ${months[period.month-1]} ${period.year}. Selecione apenas o correto.`);
+      const text=await file.text(), tableError=csvTableError(text,`CSV NinjaTrader ${file.name}`);
+      if(tableError)throw new Error(tableError);
+      const report=parseNinjaReport(text), rows=parseCsvTable(text).rows.filter(row=>row.some(cell=>cell!=='')).length;
+      group.ninjaFile={name:file.name,rows:report.tradeCount??rows,summary:report};
+    }
+    const blocks=[...grouped.values()].sort((a,b)=>(a.year*12+a.month)-(b.year*12+b.month)).map(group=>{
+      if(!group.ninjaFile)throw new Error(`Falta o relatório NinjaTrader de ${months[group.month-1]} ${group.year}.`);
+      const now=new Date().toISOString(),trades=group.trades;
+      return {id:crypto.randomUUID(),month:group.month,year:group.year,hunterVersion:String(data.hunterVersion).trim(),hsgConfig:String(data.hsgConfig).trim(),observations:String(data.observations||'').trim(),status:'processed',createdAt:now,importedAt:now,summary:summarizeTrades(trades),trades,ninjaRows:group.ninjaFile.rows,ninjaSummary:group.ninjaFile.summary,revision:1,batchSources:{hsg:[...group.hsgFiles],ninja:group.ninjaFile.name}};
+    });
+    if(!blocks.length)throw new Error('Não encontrei trades válidos para importar.');
+    pendingMonthBatch=blocks;
+    openModal(`<div class="modal-header"><div><span class="eyebrow">CONFIRA ANTES DE SALVAR</span><h2 id="modal-title">Prévia de ${blocks.length} ${blocks.length===1?'mês':'meses'}</h2><p>Os períodos foram identificados pelas datas das operações. Escolha como tratar meses que já existem.</p></div><button type="button" class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><div class="table-scroll batch-preview"><table><thead><tr><th>Mês</th><th>Trades HSG</th><th>Relatório Grid</th><th>Arquivos HSG</th><th>Se já existir</th></tr></thead><tbody>${blocks.map((block,index)=>{const duplicate=state.months.find(item=>item.month===block.month&&item.year===block.year);return `<tr><td><strong>${months[block.month-1]} ${block.year}</strong>${duplicate?'<small class="batch-duplicate">Já cadastrado</small>':''}</td><td>${block.summary.trades}</td><td>${block.ninjaRows}<small>${escapeHtml(block.batchSources.ninja)}</small></td><td>${block.batchSources.hsg.map(escapeHtml).join('<br>')}</td><td>${duplicate?`<select data-batch-mode="${index}" aria-label="Ação para ${months[block.month-1]} ${block.year}"><option value="update">Atualizar</option><option value="revision">Criar revisão</option></select>`:'Novo bloco'}</td></tr>`;}).join('')}</tbody></table></div><div class="form-errors" id="batch-errors" role="alert"></div><div class="modal-actions"><button class="button secondary" data-action="close-modal">Cancelar</button><button class="button primary" data-action="confirm-month-batch">Importar ${blocks.length} ${blocks.length===1?'mês':'meses'}</button></div>`);
+  }catch(error){errorBox.textContent=error.message||'Não foi possível organizar os arquivos selecionados.';}
+  finally{if(modalRoot.querySelector('#month-batch-form')){submit.disabled=false;form.querySelector('#import-progress').hidden=true;}}
+}
+function confirmMonthBatch() {
+  if(!pendingMonthBatch?.length)return;
+  const blocks=pendingMonthBatch, modes=new Map([...modalRoot.querySelectorAll('[data-batch-mode]')].map(select=>[Number(select.dataset.batchMode),select.value]));
+  for(const [index,block] of blocks.entries()){
+    const existing=state.months.findIndex(item=>item.month===block.month&&item.year===block.year);
+    const mode=existing>=0?(modes.get(index)||'update'):'new';
+    if(mode==='revision')block.revision=state.months[existing].revision+1;
+    if(existing>=0)state.months[existing]=block;else state.months.push(block);
+    state.audit.unshift({action:mode==='revision'?'revision':mode==='update'?'update':'import',blockId:block.id,month:block.month,year:block.year,at:new Date().toISOString(),trades:block.summary.trades,batch:true});
+  }
+  state.selectedMonthYear=Math.max(...blocks.map(block=>block.year));
+  pendingMonthBatch=null;persist();closeModal();render();showToast(`${blocks.length} ${blocks.length===1?'mês importado':'meses importados'} e organizados no calendário.`);
+}
+function deleteMonthBlock(id) {
+  const index=state.months.findIndex(block=>block.id===id);if(index<0)return;
+  const [block]=state.months.splice(index,1);
+  state.audit.unshift({action:'delete',blockId:block.id,month:block.month,year:block.year,at:new Date().toISOString(),trades:block.summary?.trades??block.trades?.length??0});
+  persist();render();showToast(`${months[block.month-1]} ${block.year} removido. O evento foi registrado na auditoria.`);
+}
+function openDeleteMonthDialog(id) {
+  const block=state.months.find(item=>item.id===id);if(!block)return;
+  openModal(`<div class="modal-header"><div><span class="eyebrow">EXCLUIR FECHAMENTO</span><h2 id="modal-title">Remover ${months[block.month-1]} ${block.year}?</h2><p>O bloco será retirado do calendário e das métricas operacionais. Um registro da exclusão ficará na auditoria; snapshots já congelados permanecem preservados.</p></div><button type="button" class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><div class="modal-actions"><button class="button secondary" data-action="close-modal">Manter mês</button><button class="button danger" data-action="confirm-delete-month" data-id="${escapeHtml(block.id)}">Excluir fechamento</button></div>`);
 }
 function openHistoricalImport(month = '', year = '') {
   const slotMode = Boolean(month && year);
@@ -193,6 +291,10 @@ document.querySelector('#menu-toggle').addEventListener('click', event => { cons
 document.addEventListener('click', event => {
   const action = event.target.closest('[data-action]')?.dataset.action;
   if (action === 'create-month') openMonthForm(event.target.closest('[data-month]')?.dataset.month || '', event.target.closest('[data-year]')?.dataset.year || new Date().getFullYear());
+  if (action === 'import-month-batch') openMonthBatchForm();
+  if (action === 'delete-month') openDeleteMonthDialog(event.target.closest('[data-id]')?.dataset.id);
+  if (action === 'confirm-delete-month') deleteMonthBlock(event.target.closest('[data-id]')?.dataset.id);
+  if (action === 'confirm-month-batch') confirmMonthBatch();
   if (action === 'create-snapshot') openSnapshotForm();
   if (action === 'historical-slot') openHistoricalImport(event.target.closest('[data-month]')?.dataset.month, event.target.closest('[data-year]')?.dataset.year);
   if (action === 'import-history') openHistoricalImport();

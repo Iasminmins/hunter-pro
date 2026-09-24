@@ -94,6 +94,17 @@ async function mirrorHsg(client, workspace, payload) {
     }
   }
 
+  // The HSG payload is the source of truth for operational month blocks.
+  // Keep revisions for months that still exist, but clear normalized rows
+  // for a month explicitly removed from the calendar.
+  const activeMonthDates = months
+    .filter(block => Number.isInteger(Number(block.year)) && Number(block.year) >= 2000 && Number(block.year) <= 2100 && Number.isInteger(Number(block.month)) && Number(block.month) >= 1 && Number(block.month) <= 12)
+    .map(block => monthDate(block));
+  await client.query(
+    `DELETE FROM hsg_months WHERE workspace_id = $1 AND NOT (month = ANY($2::date[]))`,
+    [workspace, activeMonthDates]
+  );
+
   const bases = Array.isArray(payload.historicalBases) ? payload.historicalBases : [];
   const baseIds = new Map();
   for (const base of bases) {
