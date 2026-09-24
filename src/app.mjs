@@ -179,6 +179,16 @@ function openDeleteMonthDialog(id) {
   const block=state.months.find(item=>item.id===id);if(!block)return;
   openModal(`<div class="modal-header"><div><span class="eyebrow">EXCLUIR FECHAMENTO</span><h2 id="modal-title">Remover ${months[block.month-1]} ${block.year}?</h2><p>O bloco será retirado do calendário e das métricas operacionais. Um registro da exclusão ficará na auditoria; snapshots já congelados permanecem preservados.</p></div><button type="button" class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><div class="modal-actions"><button class="button secondary" data-action="close-modal">Manter mês</button><button class="button danger" data-action="confirm-delete-month" data-id="${escapeHtml(block.id)}">Excluir fechamento</button></div>`);
 }
+function deleteHistoricalSlot(id) {
+  const index=state.historicalSlots.findIndex(slot=>slot.id===id);if(index<0)return;
+  const [slot]=state.historicalSlots.splice(index,1);
+  state.audit.unshift({action:'historical-slot-delete',slotId:slot.id,month:slot.month,year:slot.year,trades:slot.trades?.length??0,at:new Date().toISOString()});
+  persist();render();showToast(`${months[slot.month-1]} ${slot.year} removido da base histórica. O evento foi registrado na auditoria.`);
+}
+function openDeleteHistoricalSlotDialog(id) {
+  const slot=state.historicalSlots.find(item=>item.id===id);if(!slot)return;
+  openModal(`<div class="modal-header"><div><span class="eyebrow">EXCLUIR DA BASE HISTÓRICA</span><h2 id="modal-title">Remover ${months[slot.month-1]} ${slot.year}?</h2><p>Os arquivos desse mês serão removidos da grade da base histórica. Bases consolidadas e snapshots já criados permanecem preservados. A exclusão ficará registrada na auditoria.</p></div><button type="button" class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><div class="modal-actions"><button class="button secondary" data-action="close-modal">Manter mês</button><button class="button danger" data-action="confirm-delete-historical-slot" data-id="${escapeHtml(slot.id)}">Excluir mês</button></div>`);
+}
 function openHistoricalImport(month = '', year = '') {
   const slotMode = Boolean(month && year);
   openModal(`<form id="history-form" novalidate><div class="modal-header"><div><span class="eyebrow">BASE HISTÓRICA</span><h2 id="modal-title">${slotMode ? `Importar ${months[Number(month)-1]} ${year}` : 'Importar base consolidada'}</h2><p>Os dois arquivos são lidos localmente e permanecem separados dos fechamentos operacionais.</p></div><button type="button" class="icon-button" data-action="close-modal">×</button></div><div class="form-grid">${slotMode ? '' : '<label class="full-width">Nome da base<input name="name" placeholder="Histórico 2025–2026" required></label>'}<label class="file-field"><span>CSV HSG Dataset <b>*</b></span><input name="hsgFile" type="file" accept=".csv,text/csv" required></label><label class="file-field"><span>CSV NinjaTrader / Grid <b>*</b></span><input name="ninjaFile" type="file" accept=".csv,text/csv" required></label></div><div id="form-errors" class="form-errors" role="alert"></div><div class="modal-actions"><button type="button" class="button secondary" data-action="close-modal">Cancelar</button><button type="submit" class="button primary">${slotMode?'Importar mês histórico':'Importar base'}</button></div></form>`);
@@ -295,6 +305,8 @@ document.addEventListener('click', event => {
   if (action === 'select-month-year') { const year=Number(event.target.closest('[data-year]')?.dataset.year); if(Number.isInteger(year)){state.selectedMonthYear=year;persist();render();} }
   if (action === 'delete-month') openDeleteMonthDialog(event.target.closest('[data-id]')?.dataset.id);
   if (action === 'confirm-delete-month') deleteMonthBlock(event.target.closest('[data-id]')?.dataset.id);
+  if (action === 'delete-historical-slot') openDeleteHistoricalSlotDialog(event.target.closest('[data-id]')?.dataset.id);
+  if (action === 'confirm-delete-historical-slot') deleteHistoricalSlot(event.target.closest('[data-id]')?.dataset.id);
   if (action === 'confirm-month-batch') confirmMonthBatch();
   if (action === 'create-snapshot') openSnapshotForm();
   if (action === 'historical-slot') openHistoricalImport(event.target.closest('[data-month]')?.dataset.month, event.target.closest('[data-year]')?.dataset.year);

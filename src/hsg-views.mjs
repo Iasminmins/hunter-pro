@@ -55,7 +55,7 @@ function renderGeneral(state) {
 
 function renderMonths(state) {
   const currentYear=new Date().getFullYear();
-  const years = [...new Set([currentYear,currentYear-1,state.selectedMonthYear,...state.months.map(m => m.year)].filter(Boolean))].sort((a,b) => b-a);
+  const years = [...new Set([...Array.from({length:101},(_,index)=>2000+index),state.selectedMonthYear,...state.months.map(m => m.year)].filter(year=>Number.isInteger(Number(year))&&Number(year)>=2000&&Number(year)<=2100))].sort((a,b) => b-a);
   const year = Number(state.selectedMonthYear) || years[0];
   const yearTabs=[...new Set([year,currentYear-1,currentYear])].sort((a,b)=>a-b);
   const recent = weightedRecentMonths(state.months);
@@ -98,7 +98,7 @@ function renderVersions(state) {
   const year = Number(state.historicalYear) || new Date().getFullYear();
   const slots = monthNames.map((name,index) => {
     const slot=state.historicalSlots.find(item=>item.month===index+1&&item.year===year);
-    return `<article class="month-card ${slot?'has-data':''}"><span>${name}</span>${slot?`<strong>${slot.trades.length} trades HSG</strong><small>${slot.ninjaRows??'—'} operações Grid</small><label class="slot-check"><input class="slot-select" type="checkbox" value="${esc(slot.id)}"> Incluir na base</label>`:'<small>Sem dados</small>'}<button class="button ${slot?'secondary':'primary'}" data-action="historical-slot" data-month="${index+1}" data-year="${year}">${slot?'Substituir arquivos':'Importar par CSV'}</button></article>`;
+    return `<article class="month-card ${slot?'has-data':''}"><span>${name}</span>${slot?`<strong>${slot.trades.length} trades HSG</strong><small>${slot.ninjaRows??'—'} operações Grid</small><label class="slot-check"><input class="slot-select" type="checkbox" value="${esc(slot.id)}"> Incluir na base</label>`:'<small>Sem dados</small>'}<div class="month-card-actions"><button class="button ${slot?'secondary':'primary'}" data-action="historical-slot" data-month="${index+1}" data-year="${year}">${slot?'Substituir arquivos':'Importar par CSV'}</button>${slot?`<button class="button danger-quiet" data-action="delete-historical-slot" data-id="${esc(slot.id)}">Excluir mês</button>`:''}</div></article>`;
   }).join('');
   const options=state.historicalBases.map(base=>`<option value="${esc(base.id)}" ${base.id===state.selectedHistoricalBaseId?'selected':''}>${esc(base.name)}</option>`).join('');
   const selected=state.historicalBases.find(base=>base.id===state.selectedHistoricalBaseId);
